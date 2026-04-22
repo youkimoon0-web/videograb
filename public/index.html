@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoGrab - Universal Video Downloader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #080b12;
+            --surface:   #0f1420;
+            --surface2:  #161c2e;
+            --border:    rgba(255,255,255,0.07);
+            --border2:   rgba(255,255,255,0.13);
+            --accent:    #00e5ff;
+            --accent2:   #7b5ea7;
+            --accent3:   #ff4d6d;
+            --text:      #e8eaf0;
+            --muted:     rgba(232,234,240,0.45);
+            --glow:      rgba(0,229,255,0.18);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Noise grain overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+        /* ── Mesh background ── */
+        .mesh {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .mesh-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.18;
+            animation: blobFloat 18s ease-in-out infinite alternate;
+        }
+        .mesh-blob:nth-child(1) { width: 600px; height: 600px; background: var(--accent2); top: -200px; left: -200px; animation-delay: 0s; }
+        .mesh-blob:nth-child(2) { width: 500px; height: 500px; background: var(--accent);  bottom: -150px; right: -150px; animation-delay: -6s; }
+        .mesh-blob:nth-child(3) { width: 400px; height: 400px; background: var(--accent3); top: 40%; left: 50%; animation-delay: -12s; }
+
+        @keyframes blobFloat {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(40px, 30px) scale(1.08); }
+        }
+
+        /* ── Layout ── */
+        .page { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 0 1.5rem 6rem; }
+
+        /* ── Hero ── */
+        .hero {
+            padding: 5rem 0 3.5rem;
+            text-align: center;
+            animation: fadeUp 0.8s ease both;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(0,229,255,0.08);
+            border: 1px solid rgba(0,229,255,0.22);
+            border-radius: 100px;
+            padding: 0.35rem 1rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 1.8rem;
+            animation: fadeUp 0.8s 0.1s ease both;
+        }
+        .hero-badge .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        .hero h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.4rem;
+            animation: fadeUp 0.8s 0.2s ease both;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero h1 .dim { color: var(--muted); }
+
+        .hero-sub {
+            font-size: 1.1rem;
+            color: var(--muted);
+            font-weight: 300;
+            margin-bottom: 3rem;
+            animation: fadeUp 0.8s 0.3s ease both;
+        }
+
+        /* ── Input card ── */
+        .input-card {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 0 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+            animation: fadeUp 0.8s 0.4s ease both;
+        }
+
+        .url-wrap {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 14px;
+            padding: 0.5rem 0.5rem 0.5rem 1.2rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            margin-bottom: 1.25rem;
+        }
+        .url-wrap:focus-within {
+            border-color: rgba(0,229,255,0.4);
+            box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+        }
+
+        .url-wrap i { color: var(--muted); font-size: 1rem; flex-shrink: 0; }
+
+        #videoUrl {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 400;
+            padding: 0.6rem 0;
+        }
+        #videoUrl::placeholder { color: var(--muted); }
+
+        .paste-btn {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 10px;
+            padding: 0.55rem 1rem;
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .paste-btn:hover { color: var(--text); border-color: var(--border2); background: rgba(255,255,255,0.05); }
+
+        /* Platform chips */
+        #platformChips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+            min-height: 36px;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border2);
+            border-radius: 100px;
+            padding: 0.3rem 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text);
+            transition: all 0.3s;
+        }
+        .chip.detected {
+            background: rgba(0,229,255,0.08);
+            border-color: rgba(0,229,255,0.3);
+            color: var(--accent);
+            animation: chipIn 0.35s ease both;
+        }
+        @keyframes chipIn { from { opacity:0; transform:scale(0.8) translateY(4px); } to { opacity:1; transform:scale(1) translateY(0); } }
+
+        /* Download button */
+        .dl-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent) 0%, #0099bb 100%);
+            border: none;
+            border-radius: 14px;
+            padding: 1rem 1.5rem;
+            color: #080b12;
+            font-family: 'Syne', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            transition: all 0.25s;
+            box-shadow: 0 4px 30px rgba(0,229,255,0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .dl-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(0,229,255,0.35); }
+        .dl-btn:hover::after { opacity: 1; }
+        .dl-btn:active { transform: translateY(0); }
+        .dl-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* ── Progress ── */
+        #progressContainer {
+            margin-top: 1.5rem;
+            animation: fadeUp 0.4s ease both;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 0.5rem;
+        }
+        #progressText { color: var(--accent); font-weight: 500; }
+        .progress-track {
+            background: var(--surface2);
+            border-radius: 100px;
+            height: 5px;
+            overflow: hidden;
+        }
+        #progressFill {
+            height: 100%;
+            border-radius: 100px;
+            background: linear-gradient(90deg, var(--accent2), var(--accent));
+            transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+            box-shadow: 0 0 12px var(--accent);
+            width: 0%;
+        }
+
+        /* ── Download options ── */
+        #downloadOptions { margin-top: 2rem; animation: fadeUp 0.5s ease both; }
+
+        .video-meta-card {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 16px;
+            padding: 1rem 1.2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .video-meta-card img {
+            width: 100px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        .video-meta-card .meta-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .video-meta-card .meta-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            margin-bottom: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        .quality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        @media (max-width: 500px) { .quality-grid { grid-template-columns: 1fr; } }
+
+        .quality-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+        .quality-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0,229,255,0.06), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .quality-card:hover { border-color: rgba(0,229,255,0.35); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .quality-card:hover::before { opacity: 1; }
+        .quality-card:active { transform: translateY(0); }
+
+        .quality-card .q-label {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .quality-card .q-sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+        .q-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.5rem;
+            border-radius: 100px;
+            margin-left: 0.4rem;
+        }
+        .badge-4k    { background: rgba(255,77,109,0.15); color: var(--accent3); border: 1px solid rgba(255,77,109,0.3); }
+        .badge-fhd   { background: rgba(123,94,167,0.15); color: #b39ddb;        border: 1px solid rgba(123,94,167,0.3); }
+        .badge-hd    { background: rgba(0,229,255,0.1);   color: var(--accent);  border: 1px solid rgba(0,229,255,0.25); }
+        .badge-sd    { background: rgba(255,255,255,0.06); color: var(--muted);  border: 1px solid var(--border2); }
+
+        .dl-icon-btn {
+            background: rgba(0,229,255,0.1);
+            border: 1px solid rgba(0,229,255,0.2);
+            border-radius: 10px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .quality-card:hover .dl-icon-btn { background: var(--accent); color: #080b12; }
+
+        .audio-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.25s;
+            margin-top: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .audio-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,77,109,0.06), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .audio-card:hover { border-color: rgba(255,77,109,0.35); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .audio-card:hover::before { opacity: 1; }
+        .audio-card:active { transform: translateY(0); }
+        .audio-icon-btn {
+            background: rgba(255,77,109,0.1);
+            border: 1px solid rgba(255,77,109,0.2);
+            border-radius: 10px;
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--accent3);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .audio-card:hover .audio-icon-btn { background: var(--accent3); color: #fff; }
+
+        /* ── Platforms grid ── */
+        .platforms-section {
+            margin-top: 4rem;
+            animation: fadeUp 0.8s 0.6s ease both;
+        }
+        .platforms-section h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .platforms-section p {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .platforms-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 560px) { .platforms-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .platform-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.2rem 0.75rem;
+            text-align: center;
+            transition: all 0.25s;
+            cursor: default;
+        }
+        .platform-card:hover { border-color: var(--border2); transform: translateY(-3px); background: var(--surface2); }
+        .platform-card i { font-size: 1.5rem; margin-bottom: 0.5rem; display: block; }
+        .platform-card span { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 14px;
+            padding: 0.9rem 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.88rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            z-index: 1000;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+            max-width: 320px;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-left: 3px solid var(--accent); }
+        .toast.error   { border-left: 3px solid var(--accent3); }
+        .toast i.success-icon { color: var(--accent); }
+        .toast i.error-icon   { color: var(--accent3); }
+
+        /* ── Animations ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(22px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .hidden { display: none !important; }
+
+        /* ── Spinner ── */
+        .spin { animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- Mesh background -->
+    <div class="mesh">
+        <div class="mesh-blob"></div>
+        <div class="mesh-blob"></div>
+        <div class="mesh-blob"></div>
+    </div>
+
+    <div class="page">
+
+        <!-- Hero -->
+        <header class="hero">
+            <div class="hero-badge">
+                <span class="dot"></span>
+                100+ Platforms Supported
+            </div>
+            <h1>Video<span class="accent">Grab</span><span class="dim">.</span></h1>
+            <p class="hero-sub">Download videos from YouTube, Instagram, TikTok & more — free, fast, no limits.</p>
+        </header>
+
+        <!-- Input Card -->
+        <div class="input-card">
+            <div class="url-wrap">
+                <i class="fas fa-link"></i>
+                <input type="url" id="videoUrl" placeholder="Paste a video link…" autocomplete="off" spellcheck="false">
+                <button class="paste-btn" onclick="pasteUrl()"><i class="fas fa-clipboard"></i> Paste</button>
+            </div>
+
+            <div id="platformChips">
+                <div class="chip"><i class="fab fa-youtube" style="color:#ff4444"></i> YouTube</div>
+                <div class="chip"><i class="fab fa-instagram" style="color:#e1306c"></i> Instagram</div>
+                <div class="chip"><i class="fab fa-tiktok"></i> TikTok</div>
+                <div class="chip"><i class="fab fa-x-twitter"></i> X</div>
+            </div>
+
+            <button class="dl-btn" id="downloadBtn">
+                <i class="fas fa-magnifying-glass"></i>
+                <span id="btnText">Analyze & Download</span>
+            </button>
+
+            <!-- Progress -->
+            <div id="progressContainer" class="hidden">
+                <div class="progress-header">
+                    <span id="progressStatus">Detecting platform…</span>
+                    <span id="progressText">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- Download Options -->
+            <div id="downloadOptions" class="hidden">
+                <div id="videoMetaCard"></div>
+
+                <div class="section-label">📹 Video Quality</div>
+                <div class="quality-grid" id="qualityOptions"></div>
+
+                <div class="section-label">🎵 Audio Only</div>
+                <div
+                    class="audio-card"
+                    onclick="downloader.downloadAudio()"
+                >
+                    <div>
+                        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;">MP3 Audio</div>
+                        <div class="q-sub">Best quality · 320kbps</div>
+                    </div>
+                    <div class="audio-icon-btn"><i class="fas fa-music"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supported Platforms -->
+        <section class="platforms-section">
+            <h2>Every Platform. One Tool.</h2>
+            <p>Works wherever videos live on the internet.</p>
+            <div class="platforms-grid">
+                <div class="platform-card"><i class="fab fa-youtube" style="color:#ff4444"></i><span>YouTube</span></div>
+                <div class="platform-card"><i class="fab fa-instagram" style="color:#e1306c"></i><span>Instagram</span></div>
+                <div class="platform-card"><i class="fab fa-tiktok" style="color:#e8eaf0"></i><span>TikTok</span></div>
+                <div class="platform-card"><i class="fab fa-x-twitter" style="color:#e8eaf0"></i><span>X (Twitter)</span></div>
+                <div class="platform-card"><i class="fab fa-facebook" style="color:#1877f2"></i><span>Facebook</span></div>
+                <div class="platform-card"><i class="fab fa-reddit" style="color:#ff4500"></i><span>Reddit</span></div>
+                <div class="platform-card"><i class="fab fa-vimeo" style="color:#1ab7ea"></i><span>Vimeo</span></div>
+                <div class="platform-card"><i class="fas fa-globe" style="color:#4caf50"></i><span>& 100+ More</span></div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        // ── Paste button ──────────────────────────────────────────────────────
+        async function pasteUrl() {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('videoUrl').value = text;
+                downloader.detectPlatform(text);
+            } catch { showToast('Could not access clipboard', 'error'); }
+        }
+
+        // ── Main class ────────────────────────────────────────────────────────
+        class VideoDownloader {
+            constructor() {
+                this.urlInput          = document.getElementById('videoUrl');
+                this.downloadBtn       = document.getElementById('downloadBtn');
+                this.btnText           = document.getElementById('btnText');
+                this.progressContainer = document.getElementById('progressContainer');
+                this.progressFill      = document.getElementById('progressFill');
+                this.progressStatus    = document.getElementById('progressStatus');
+                this.progressText      = document.getElementById('progressText');
+                this.platformChips     = document.getElementById('platformChips');
+                this.downloadOptions   = document.getElementById('downloadOptions');
+                this.qualityOptions    = document.getElementById('qualityOptions');
+                this.videoMetaCard     = document.getElementById('videoMetaCard');
+                this.init();
+            }
+
+            init() {
+                this.downloadBtn.addEventListener('click', () => this.handleDownload());
+                this.urlInput.addEventListener('keypress', e => { if (e.key === 'Enter') this.handleDownload(); });
+                this.urlInput.addEventListener('input',    e => this.detectPlatform(e.target.value));
+            }
+
+            detectPlatform(url) {
+                const platforms = {
+                    youtube:   { re: /youtube\.com|youtu\.be/,  icon: 'fab fa-youtube',   color: '#ff4444', label: 'YouTube' },
+                    instagram: { re: /instagram\.com/,           icon: 'fab fa-instagram', color: '#e1306c', label: 'Instagram' },
+                    tiktok:    { re: /tiktok\.com/,              icon: 'fab fa-tiktok',    color: '#e8eaf0', label: 'TikTok' },
+                    twitter:   { re: /twitter\.com|x\.com/,     icon: 'fab fa-x-twitter', color: '#e8eaf0', label: 'X (Twitter)' },
+                    facebook:  { re: /facebook\.com/,            icon: 'fab fa-facebook',  color: '#1877f2', label: 'Facebook' },
+                    reddit:    { re: /reddit\.com/,              icon: 'fab fa-reddit',    color: '#ff4500', label: 'Reddit' },
+                    vimeo:     { re: /vimeo\.com/,               icon: 'fab fa-vimeo',     color: '#1ab7ea', label: 'Vimeo' }
+                };
+
+                this.platformChips.innerHTML = '';
+                let matched = false;
+
+                Object.values(platforms).forEach(p => {
+                    if (p.re.test(url)) {
+                        matched = true;
+                        const chip = document.createElement('div');
+                        chip.className = 'chip detected';
+                        chip.innerHTML = `<i class="${p.icon}" style="color:${p.color}"></i> ${p.label}`;
+                        this.platformChips.appendChild(chip);
+                    }
+                });
+
+                if (!matched && url.length > 0) {
+                    const chip = document.createElement('div');
+                    chip.className = 'chip detected';
+                    chip.innerHTML = `<i class="fas fa-globe" style="color:#4caf50"></i> Unknown Platform`;
+                    this.platformChips.appendChild(chip);
+                }
+
+                if (url.length === 0) {
+                    ['YouTube','Instagram','TikTok','X'].forEach((l, i) => {
+                        const icons = ['fab fa-youtube" style="color:#ff4444','fab fa-instagram" style="color:#e1306c','fab fa-tiktok','fab fa-x-twitter'];
+                        const chip = document.createElement('div');
+                        chip.className = 'chip';
+                        chip.innerHTML = `<i class="${icons[i]}"></i> ${l}`;
+                        this.platformChips.appendChild(chip);
+                    });
+                }
+            }
+
+            async handleDownload() {
+                const url = this.urlInput.value.trim();
+                if (!url) { showToast('Please enter a video URL', 'error'); return; }
+                this.resetState();
+                this.setLoading(true);
+                await this.analyzeVideo(url);
+            }
+
+            resetState() {
+                this.updateProgress(0, '');
+                this.progressContainer.classList.add('hidden');
+                this.downloadOptions.classList.add('hidden');
+                this.qualityOptions.innerHTML = '';
+                this.videoMetaCard.innerHTML = '';
+            }
+
+            async analyzeVideo(url) {
+                try {
+                    this.progressContainer.classList.remove('hidden');
+                    this.updateProgress(20, 'Detecting platform…');
+
+                    const response = await fetch('/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url, action: 'info' })
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || 'Failed to fetch video info');
+                    }
+
+                    const info = await response.json();
+                    this.updateProgress(60, 'Analyzing qualities…');
+                    await this.delay(400);
+                    this.updateProgress(90, 'Preparing options…');
+                    await this.delay(300);
+                    this.updateProgress(100, 'Ready!');
+                    this.showOptions(info);
+
+                } catch (error) {
+                    showToast('Error: ' + error.message, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            showOptions(info) {
+                this.downloadOptions.classList.remove('hidden');
+
+                // Meta card
+                if (info.title) {
+                    const dur = info.duration ? this.formatDuration(info.duration) : '';
+                    this.videoMetaCard.innerHTML = `
+                        <div class="video-meta-card">
+                            ${info.thumbnail ? `<img src="${info.thumbnail}" alt="thumb">` : ''}
+                            <div>
+                                <div class="meta-title">${this.escapeHtml(info.title)}</div>
+                                <div class="meta-sub">${info.uploader ? this.escapeHtml(info.uploader) : ''}${dur ? ' · ' + dur : ''}</div>
+                            </div>
+                        </div>`;
+                }
+
+                // Quality cards
+                const qualities = info.availableQualities || [];
+                if (qualities.length > 0) {
+                    this.qualityOptions.innerHTML = qualities.map(q => `
+                        <div class="quality-card" onclick="downloader.downloadVideo(${q.height})">
+                            <div>
+                                <div class="q-label">
+                                    ${q.height}p
+                                    <span class="q-badge ${this.badgeClass(q.height)}">${this.qualityLabel(q.height)}</span>
+                                </div>
+                                <div class="q-sub">${q.filesize ? Math.round(q.filesize/1024/1024)+' MB · ' : ''}MP4</div>
+                            </div>
+                            <div class="dl-icon-btn"><i class="fas fa-download"></i></div>
+                        </div>`).join('');
+                } else {
+                    this.qualityOptions.innerHTML = `
+                        <div class="quality-card" onclick="downloader.downloadVideo(null)" style="grid-column:span 2">
+                            <div>
+                                <div class="q-label">Best Quality <span class="q-badge badge-fhd">AUTO</span></div>
+                                <div class="q-sub">Highest available · MP4</div>
+                            </div>
+                            <div class="dl-icon-btn"><i class="fas fa-download"></i></div>
+                        </div>`;
+                }
+            }
+
+            badgeClass(h) {
+                if (h >= 2160) return 'badge-4k';
+                if (h >= 1080) return 'badge-fhd';
+                if (h >= 720)  return 'badge-hd';
+                return 'badge-sd';
+            }
+
+            qualityLabel(h) {
+                if (h >= 2160) return '4K';
+                if (h >= 1080) return 'FHD';
+                if (h >= 720)  return 'HD';
+                if (h >= 480)  return 'SD';
+                return 'Low';
+            }
+
+            async downloadVideo(quality = null) {
+                const url = this.urlInput.value.trim();
+                if (!url) { showToast('Please enter a video URL', 'error'); return; }
+                this.setLoading(true);
+                this.updateProgress(0, quality ? `Downloading ${quality}p…` : 'Downloading best quality…');
+                this.progressContainer.classList.remove('hidden');
+                try {
+                    this.updateProgress(30, 'Preparing download…');
+                    const response = await fetch('/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url, action: 'download', format: 'video', quality })
+                    });
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || 'Download failed');
+                    }
+                    const result = await response.json();
+                    this.updateProgress(100, '✓ Download complete!');
+                    showToast(`Ready: ${result.filename}`, 'success');
+                    this.triggerDownload(result.path, result.filename);
+                } catch (error) {
+                    showToast('Download failed: ' + error.message, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            async downloadAudio() {
+                const url = this.urlInput.value.trim();
+                if (!url) { showToast('Please enter a video URL', 'error'); return; }
+                this.setLoading(true);
+                this.updateProgress(0, 'Extracting audio…');
+                this.progressContainer.classList.remove('hidden');
+                try {
+                    this.updateProgress(30, 'Converting to MP3…');
+                    const response = await fetch('/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url, action: 'download', format: 'audio' })
+                    });
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || 'Audio download failed');
+                    }
+                    const result = await response.json();
+                    this.updateProgress(100, '✓ Audio ready!');
+                    showToast(`Audio ready: ${result.filename}`, 'success');
+                    this.triggerDownload(result.path, result.filename);
+                } catch (error) {
+                    showToast('Download failed: ' + error.message, 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            triggerDownload(filePath, filename) {
+                const a = document.createElement('a');
+                a.href = filePath;
+                a.download = filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+
+            setLoading(loading) {
+                if (loading) {
+                    this.downloadBtn.disabled = true;
+                    this.downloadBtn.querySelector('i').className = 'fas fa-circle-notch spin';
+                    this.btnText.textContent = 'Working…';
+                } else {
+                    this.downloadBtn.disabled = false;
+                    this.downloadBtn.querySelector('i').className = 'fas fa-magnifying-glass';
+                    this.btnText.textContent = 'Analyze & Download';
+                }
+            }
+
+            updateProgress(pct, status) {
+                this.progressFill.style.width = pct + '%';
+                this.progressText.textContent = pct + '%';
+                this.progressStatus.textContent = status;
+            }
+
+            formatDuration(secs) {
+                const m = Math.floor(secs / 60), s = secs % 60;
+                return `${m}:${String(s).padStart(2,'0')}`;
+            }
+
+            escapeHtml(str) {
+                const d = document.createElement('div');
+                d.appendChild(document.createTextNode(str));
+                return d.innerHTML;
+            }
+
+            delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+        }
+
+        // ── Toast ─────────────────────────────────────────────────────────────
+        function showToast(message, type = 'success') {
+            document.querySelectorAll('.toast').forEach(t => t.remove());
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <i class="fas ${type === 'error' ? 'fa-circle-exclamation error-icon' : 'fa-circle-check success-icon'}"></i>
+                <span>${escapeToast(message)}</span>`;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => { requestAnimationFrame(() => { toast.classList.add('show'); }); });
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 4000);
+        }
+
+        function escapeToast(str) {
+            const d = document.createElement('div');
+            d.appendChild(document.createTextNode(str));
+            return d.innerHTML;
+        }
+
+        // ── Init ──────────────────────────────────────────────────────────────
+        let downloader;
+        document.addEventListener('DOMContentLoaded', () => { downloader = new VideoDownloader(); });
+    </script>
+</body>
+</html>
