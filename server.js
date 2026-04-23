@@ -49,9 +49,9 @@ function scheduleCleanup(filePath) {
     }, 10 * 60 * 1000);
 }
 
-// ─── yt-dlp base args — tv_embedded gives 144p to 1080p without PO Token ──────
+// ─── yt-dlp base args — android gives 144p to 1080p without PO Token ──────
 const YTDLP_BASE_ARGS = [
-    '--extractor-args', 'youtube:player_client=tv_embedded',
+    '--extractor-args', 'youtube:player_client=android',
     '--no-playlist',
 ];
 
