@@ -78,7 +78,7 @@ async function getVideoInfo(rawUrl) {
         const url = cleanUrl(rawUrl);
         console.log('🔍 Fetching info for:', url);
 
-        const ytDlp = spawn('python', [
+        const ytDlp = spawn('python3', [
             '-m', 'yt_dlp',
             ...YTDLP_BASE_ARGS,
             '--dump-json',
@@ -130,7 +130,7 @@ async function downloadVideo(rawUrl, outputPath, quality) {
 
         console.log(`📥 Downloading ${quality ? quality + 'p' : 'best'} video...`);
 
-        const ytDlp = spawn('python', [
+        const ytDlp = spawn('python3', [
             '-m', 'yt_dlp',
             ...YTDLP_BASE_ARGS,
             '-f', formatSpec,
@@ -171,7 +171,7 @@ async function downloadAudioMP3(rawUrl, outputPath) {
         const url = cleanUrl(rawUrl);
         console.log('🎵 Downloading audio...');
 
-        const ytDlp = spawn('python', [
+        const ytDlp = spawn('python3', [
             '-m', 'yt_dlp',
             ...YTDLP_BASE_ARGS,
             '-f', 'bestaudio[ext=m4a]/bestaudio/best',
